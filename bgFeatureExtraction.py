@@ -1,9 +1,7 @@
 from sklearn.cluster import KMeans
 from collections import Counter
 import cv2 
-import matplotlib.pyplot as plt
 import numpy as np
-
 
 
 class bgFeatureExtractor():
@@ -20,10 +18,11 @@ class bgFeatureExtractor():
         if not self.face_cascade.load(face_cascade_name):
             print('--(!)Error loading face cascade')
         
-    def run(self, image):
+    def run(self, image, filename):
         face_rect = self.get_face_rect(image=image)
         pixel_vec = self.add_mask_and_transform_to_pixel_vector(image=image, rect=face_rect)
-        col = self.get_main_colors(pixel_vec)
+        colors = self.get_main_colors(pixel_vec)
+        return colors, filename
 
     def get_face_rect(self, image, scaleFactor = 2):
         image_copy = image.copy()
@@ -43,10 +42,10 @@ class bgFeatureExtractor():
         result = image[mask]
         return result
 
-    def get_main_colors(self, pixel_vec, k=4, colors_count = 5):
+    def get_main_colors(self, pixel_vec, k=4, colors_count = 7):
         if colors_count > k:
             k = colors_count+1
-        clt = KMeans(n_clusters = k)
+        clt = KMeans(n_clusters = k, n_init = 10)
         labels = clt.fit_predict(pixel_vec)
         label_count = Counter(labels)
         most_common_colors = label_count.most_common(colors_count)
