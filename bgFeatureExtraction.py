@@ -30,7 +30,8 @@ class bgFeatureExtractor():
         faces_rect = self.face_cascade.detectMultiScale(gray_image, scaleFactor=scaleFactor, minNeighbors = 5)
         
         if len(faces_rect) ==0:
-            faces_rect = (100, 100, 260, 260)
+            img_shape = np.shape(image)
+            faces_rect = (img_shape[0] * 0.25, img_shape[0]* 0.25, img_shape[1] * 0.75, img_shape[1] * 0.75)
             return faces_rect
         return (faces_rect[0][0], faces_rect[0][1], faces_rect[0][0]+faces_rect[0][2], faces_rect[0][1]+faces_rect[0][3])
         
