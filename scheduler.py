@@ -177,7 +177,7 @@ class Scheduler:
                     X_train,
                     y_train,
                     validation_data = (X_valid, y_valid),
-                    verbose=2, epochs=30
+                    verbose=2, epochs=50
                     )
 
 
@@ -214,7 +214,6 @@ class Scheduler:
                 plt.ylim([0,1.0])
                 plt.title('Training and Validation Loss [MAE]')
                 plt.xlabel('epoch')
-                plt.show()
                 plt.savefig(f'training_cv{index}.png')
                 plt.clf()
                 
