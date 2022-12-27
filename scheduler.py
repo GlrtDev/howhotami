@@ -38,7 +38,7 @@ def r2_keras(y_true, y_pred):
 class Scheduler:
 
     def __init__(self) -> None:
-        self.db_path = 'SCUT-FBP5500_v2'
+        self.db_path = 'howhotami/SCUT-FBP5500_v2'
 
     def load_img_paths(self):
         files = [f for f in listdir(f'{self.db_path}/Images') if isfile(join(f'{self.db_path}/Images', f))]
@@ -51,9 +51,7 @@ class Scheduler:
 
 
     def run(self, transfer_learning = False):
-        cross_val_r2_scores = []
-        cross_val_MAE_scores = []
-        cross_val_RMSE_scores = []
+        
         if not transfer_learning:
             print('starting color regression...')
             if isfile('output.csv'):
@@ -143,93 +141,112 @@ class Scheduler:
                 X.append(cv2.resize(img, image_size, interpolation = cv2.INTER_AREA))
                 Y.append(ratings_df_grouped.at[filename, 'Rating'])
             
-            X = np.array(X)
+            X_raw = np.array(X)
             Y = np.array(Y)
-            X = tf.keras.applications.mobilenet_v2.preprocess_input(X)
-            #X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=92)
-            base_model = tf.keras.applications.MobileNetV2(include_top=False, input_shape=(image_size[0],image_size[1],3))
-            base_model.trainable = False
 
-            kfold = KFold(n_splits=5, shuffle=True, random_state=43)
-            index = 0
-            for train, test in kfold.split(X, Y):
+            for model_index in ['mobilenet2', 'resnetv2', 'vgg19', 'xception']:
+                cross_val_r2_scores = []
+                cross_val_MAE_scores = []
+                cross_val_RMSE_scores = []
                 
-                X_test, X_valid, y_test, y_valid = train_test_split(X[test], Y[test], test_size=0.5, random_state=92)
-                X_train = X[train]
-                y_train = Y[train]
+                if model_index == 'resnetv2':
+                    X = tf.keras.applications.resnet_v2.preprocess_input(X_raw)
+                    base_model = tf.keras.applications.ResNet50V2(include_top=False, input_shape=(image_size[0],image_size[1],3))
+                if model_index == 'mobilenet2':
+                    X = tf.keras.applications.mobilenet_v2.preprocess_input(X_raw)
+                    base_model = tf.keras.applications.MobileNetV2(include_top=False, input_shape=(image_size[0],image_size[1],3))
+                if model_index == 'vgg19':
+                    X = tf.keras.applications.vgg19.preprocess_input(X_raw)
+                    base_model = tf.keras.applications.VGG19(include_top=False, input_shape=(image_size[0],image_size[1],3))
+                if model_index == 'xception':
+                    X = tf.keras.applications.xception.preprocess_input(X_raw)
+                    base_model = tf.keras.applications.Xception(include_top=False, input_shape=(image_size[0],image_size[1],3))
+                
+                base_model.trainable = False
 
-                model2 = keras.Sequential(
-                [
-                    layers.BatchNormalization(input_shape = (image_size[0],image_size[1],3)),
-                    base_model,
-                    layers.BatchNormalization(),
-                    layers.GlobalAveragePooling2D(),
-                    layers.Dropout(0.2),
-                    layers.Dense(1, activation = 'linear')
-                ]
-                )
+                kfold = KFold(n_splits=5, shuffle=True, random_state=43)
+                index = 0
+                for train, test in kfold.split(X, Y):
+                    
+                    X_test, X_valid, y_test, y_valid = train_test_split(X[test], Y[test], test_size=0.5, random_state=92)
+                    X_train = X[train]
+                    y_train = Y[train]
 
-                model2.summary()
-                model2.compile(loss='mean_absolute_error',
-                    optimizer=tf.keras.optimizers.Adam(0.001),
-                    metrics=[r2_keras])
-                history = model2.fit(
-                    X_train,
-                    y_train,
-                    validation_data = (X_valid, y_valid),
-                    verbose=2, epochs=50
+                    model2 = keras.Sequential(
+                    [
+                        layers.BatchNormalization(input_shape = (image_size[0],image_size[1],3)),
+                        base_model,
+                        layers.BatchNormalization(),
+                        layers.GlobalAveragePooling2D(),
+                        layers.Dropout(0.2),
+                        layers.Dense(1, activation = 'linear')
+                    ]
                     )
 
+                    model2.summary()
+                    model2.compile(loss='mean_absolute_error',
+                        optimizer=tf.keras.optimizers.Adam(0.001),
+                        metrics=[r2_keras])
+                    history = model2.fit(
+                        X_train,
+                        y_train,
+                        validation_data = (X_valid, y_valid),
+                        verbose=2, epochs=2
+                        )
 
-                test_predictions = model2.predict(X_test).flatten()
-                a = plt.axes(aspect='equal')
-                plt.scatter(y_test, test_predictions)
-                plt.xlabel('True Values')
-                plt.ylabel('Predictions')
-                lims = [1, 5]
-                plt.xlim(lims)
-                plt.ylim(lims)
-                plt.plot(lims, lims)
-                plt.savefig(f'predict_cv{index}.png')
-                plt.clf()
-                index += 1
 
-                acc = history.history['r2_keras']
-                val_acc = history.history['val_r2_keras']
-                loss = history.history['loss']
-                val_loss = history.history['val_loss']
-                plt.figure(figsize=(8, 8))
-                plt.subplot(2, 1, 1)
-                plt.plot(acc, label='Training r2 score')
-                plt.plot(val_acc, label='Validation r2 score')
-                plt.legend(loc='lower right')
-                plt.ylabel('r2 score')
-                plt.ylim([0,1.0])
-                plt.title('Training and Validation r2 score')
-                plt.subplot(2, 1, 2)
-                plt.plot(loss, label='Training Loss')
-                plt.plot(val_loss, label='Validation Loss')
-                plt.legend(loc='upper right')
-                plt.ylabel('Cross Entropy')
-                plt.ylim([0,1.0])
-                plt.title('Training and Validation Loss [MAE]')
-                plt.xlabel('epoch')
-                plt.savefig(f'training_cv{index}.png')
-                plt.clf()
-                
-                scoresR2 = r2_score(y_test, test_predictions)
-                scoresMAE = max_error(y_test, test_predictions)
-                scoresRMSE = np.sqrt(mean_squared_error(y_test, test_predictions))
-                print(f'r2: {scoresR2}')
-                print(f'MAE: {scoresMAE}')
-                print(f'RMSE: {scoresRMSE}')
-                cross_val_r2_scores.append(scoresR2)
-                cross_val_MAE_scores.append(scoresMAE)
-                cross_val_RMSE_scores.append(scoresRMSE)
-        print('final')
-        print(f'r2: {cross_val_r2_scores}')
-        print(f'MAE: {cross_val_MAE_scores}')
-        print(f'RMSE: {cross_val_RMSE_scores}')
+                    test_predictions = model2.predict(X_test).flatten()
+                    a = plt.axes(aspect='equal')
+                    plt.scatter(y_test, test_predictions)
+                    plt.xlabel('True Values')
+                    plt.ylabel('Predictions')
+                    lims = [1, 5]
+                    plt.xlim(lims)
+                    plt.ylim(lims)
+                    plt.plot(lims, lims)
+                    plt.savefig(f'predict_cv{index}_{model_index}.png')
+                    plt.clf()
+                    index += 1
+
+                    acc = history.history['r2_keras']
+                    val_acc = history.history['val_r2_keras']
+                    loss = history.history['loss']
+                    val_loss = history.history['val_loss']
+                    plt.figure(figsize=(8, 8))
+                    plt.subplot(2, 1, 1)
+                    plt.plot(acc, label='Training r2 score')
+                    plt.plot(val_acc, label='Validation r2 score')
+                    plt.legend(loc='lower right')
+                    plt.ylabel('r2 score')
+                    plt.ylim([0,1.0])
+                    plt.title('Training and Validation r2 score')
+                    plt.subplot(2, 1, 2)
+                    plt.plot(loss, label='Training Loss')
+                    plt.plot(val_loss, label='Validation Loss')
+                    plt.legend(loc='upper right')
+                    plt.ylabel('loss [MAE]')
+                    plt.ylim([0,1.0])
+                    plt.title('Training and Validation Loss [MAE]')
+                    plt.xlabel('epoch')
+                    plt.savefig(f'training_cv{index}_{model_index}.png')
+                    plt.clf()
+                    
+                    scoresR2 = r2_score(y_test, test_predictions)
+                    scoresMAE = max_error(y_test, test_predictions)
+                    scoresRMSE = np.sqrt(mean_squared_error(y_test, test_predictions))
+                    print(f'r2: {scoresR2}')
+                    print(f'MAE: {scoresMAE}')
+                    print(f'RMSE: {scoresRMSE}')
+                    cross_val_r2_scores.append(scoresR2)
+                    cross_val_MAE_scores.append(scoresMAE)
+                    cross_val_RMSE_scores.append(scoresRMSE)
+                print('final')
+                print(f'r2: {cross_val_r2_scores}')
+                print(f'MAE: {cross_val_MAE_scores}')
+                print(f'RMSE: {cross_val_RMSE_scores}')
+                f = open(f"{model_index}.txt", "w")
+                f.write(f"r2: {cross_val_r2_scores}\nMAE: {cross_val_MAE_scores}\nRMSE: {cross_val_RMSE_scores}")
+                f.close()
             #model2.save("model_transfer.h5")
 
 
