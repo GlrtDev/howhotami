@@ -191,7 +191,7 @@ class Scheduler:
                         X_train,
                         y_train,
                         validation_data = (X_valid, y_valid),
-                        verbose=2, epochs=2
+                        verbose=2, epochs=100
                         )
 
 
@@ -247,7 +247,7 @@ class Scheduler:
                 f = open(f"{model_index}.txt", "w")
                 f.write(f"r2: {cross_val_r2_scores}\nMAE: {cross_val_MAE_scores}\nRMSE: {cross_val_RMSE_scores}")
                 f.close()
-            #model2.save("model_transfer.h5")
+                model2.save(f"model_{model_index}.h5")
 
 
 scheduler = Scheduler()
