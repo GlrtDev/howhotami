@@ -13,9 +13,6 @@ class bgFeatureExtractor():
 
     def __init__(self) -> None:
         self.face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_alt.xml')
-
-        if not self.face_cascade.load():
-            print('--(!)Error loading face cascade')
         
     def run(self, image, filename):
         face_rect = self.get_face_rect(image=image)
