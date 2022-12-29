@@ -12,10 +12,9 @@ class bgFeatureExtractor():
     # step 4 find dominant color
 
     def __init__(self) -> None:
-        self.face_cascade = cv2.CascadeClassifier()
-        face_cascade_name = cv2.data.haarcascades + 'haarcascade_frontalface_alt.xml'
+        self.face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_alt.xml')
 
-        if not self.face_cascade.load(face_cascade_name):
+        if not self.face_cascade.load():
             print('--(!)Error loading face cascade')
         
     def run(self, image, filename):
